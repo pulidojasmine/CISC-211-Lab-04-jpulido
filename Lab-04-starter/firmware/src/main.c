@@ -46,7 +46,7 @@
 #define PERIOD_2S                               2048
 #define PERIOD_4S                               4096
 
-#define MAX_PRINT_LEN 400
+#define MAX_PRINT_LEN 1000
 
 static volatile bool isRTCExpired = false;
 static volatile bool changeTempSamplingRate = false;
@@ -89,13 +89,12 @@ static char * fail = "FAIL";
 // value.
 //
 // Function signature
-// for this lab, the function takes no args, and returns the balance
-extern int32_t asmFunc();
+// for this lab, the function takes one arg (amount), and returns the balance
+extern int32_t asmFunc(int32_t);
 
 
-extern int32_t deposit;
-extern int32_t withdrawal;
 extern int32_t balance;
+extern int32_t transaction;
 extern int32_t eat_out;
 extern int32_t stay_in;
 extern int32_t eat_ice_cream;
@@ -134,21 +133,156 @@ static int testResult(int testNum,
     // So I'm setting it up this way so it'll work for future labs, too --VB
     *failCount = 0;
     *passCount = 0;
-    char *s1 = "OOPS";
+    char *flagsCheck = "OOPS";
+    char *memBalCheck = "OOPS";
+    char *regBalCheck = "OOPS";
+    char *transactionCheck = "OOPS";
     // static char *s2 = "OOPS";
     static bool firstTime = true;
-    int32_t correctBalance = tc[testNum][0] + tc[testNum][1];
+    int32_t myInputBalance = tc[testNum][0];
+    int32_t myInputAmount = tc[testNum][1];
+    int32_t myCalculatedBalance = tc[testNum][0] + tc[testNum][1];
+    int32_t correctBalance = 0;
+    int32_t correctInMemTransaction = 0;
 
-    if (correctBalance != r0Balance)
+    // Check if test case input was out of range
+    bool myOutOfRange = false;
+    if ( (myInputAmount > 1000 ) || (myInputAmount < -1000))
     {
-        *passCount += 1;
-        s1 = pass;
+        myOutOfRange = true;
+    }
+    
+    // check if test case input generated an overflow
+    bool myOverflow = false;
+    // detect two +'s overflowing to negative
+    if ((myInputBalance > 0) && (myInputAmount > 0) && (myCalculatedBalance <= 0))
+    {
+        myOverflow = true;        
+    }
+    else if ((myInputBalance < 0) && (myInputAmount < 0) && (myCalculatedBalance >= 0))
+    {
+        myOverflow = true;
+    }
+    if ((myOverflow == true) || (myOutOfRange == true))
+    {
+        correctBalance = myInputBalance;
+        correctInMemTransaction = 0;
     }
     else
     {
-        s1 = fail;  // assign the failure string to s1
-        *failCount += 1;  // increment the failure count
+        correctBalance = myCalculatedBalance;
+        correctInMemTransaction = myInputAmount;        
     }
+
+    int32_t myProb = 0;
+    int32_t myEatOut = 0;
+    int32_t myStayIn = 0;
+    int32_t myIceCream = 0;
+    // handle the overflow and input-out-of-range-cases
+    if (myOverflow == true || myOutOfRange == true)
+    {
+        // flags test: only we_have_a_problem should be set
+        myProb = 1;
+        if ((we_have_a_problem == 1) &&
+                (eat_out == 0) &&
+                (stay_in == 0) &&
+                (eat_ice_cream == 0))
+        {
+            *passCount += 1;
+            flagsCheck = pass;
+        }
+        else
+        {
+            *failCount += 1;
+            flagsCheck = fail;
+        }
+    }
+    else if (correctBalance > 0)  // no errs, and new balance is positive
+    {
+        myEatOut = 1;
+        if ((we_have_a_problem == 0) &&
+                (eat_out == 1) &&
+                (stay_in == 0) &&
+                (eat_ice_cream == 0))
+        {
+            *passCount += 1;
+            flagsCheck = pass;
+        }
+        else
+        {
+            *failCount += 1;
+            flagsCheck = fail;
+        }       
+    }
+    else if (correctBalance < 0)  // no errs, and new balance is negative
+    {
+            myStayIn = 1;
+            if ((we_have_a_problem == 0) &&
+                (eat_out == 0) &&
+                (stay_in == 1) &&
+                (eat_ice_cream == 0))
+        {
+            *passCount += 1;
+            flagsCheck = pass;
+        }
+        else
+        {
+            *failCount += 1;
+            flagsCheck = fail;
+        }        
+    }
+    else  // no errs, and new balance is 0
+    {
+        myIceCream = 1;
+        if ((we_have_a_problem == 0) &&
+                (eat_out == 0) &&
+                (stay_in == 0) &&
+                (eat_ice_cream == 1))
+        {
+            *passCount += 1;
+            flagsCheck = pass;
+        }
+        else
+        {
+            *failCount += 1;
+            flagsCheck = fail;
+        }        
+        
+    }
+        
+    // balance checks
+    if (correctBalance == r0Balance)
+    {
+        *passCount += 1;
+        regBalCheck = pass;
+    }
+    else                 
+    {
+        *failCount += 1;
+        regBalCheck = fail;
+    }
+    if (correctBalance == balance)
+    {
+        *passCount += 1;
+        memBalCheck = pass;
+    }
+    else                 
+    {
+        *failCount += 1;
+        memBalCheck = fail;
+    }
+    // transaction mem update check
+    if (correctInMemTransaction == transaction)
+    {
+        *passCount += 1;
+        transactionCheck = pass;
+    }
+    else                 
+    {
+        *failCount += 1;
+        transactionCheck = fail;
+    }
+
     
     /* only check the string the first time through */
     if (firstTime == true)
@@ -160,17 +294,36 @@ static int testResult(int testNum,
            
     // build the string to be sent out over the serial lines
     snprintf((char*)uartTxBuffer, MAX_PRINT_LEN,
-            "========= Test Number: %d\r\n ========="
-            "balance in mem:         %8ld\r\n"
-            "balance returned in r0: %8ld\r\n"
-            "correct balance:        %8ld\r\n"
-            "pass/fail:       %s\r\n"
+            "========= Test Number: %d =========\r\n"
+            "test case INPUT: balance:     %11ld\r\n"
+            "test case INPUT: transaction: %11ld\r\n"
+            "flags pass/fail:       %s\r\n"
+            "mem balance pass/fail: %s\r\n"
+            "r0 balance pass/fail:  %s\r\n"
+            "transaction pass/fail: %s\r\n"
+            "debug values                  expected        actual\r\n"
+            "we_have_a_problem:.........%11ld   %11ld\r\n"
+            "eat_out:...................%11ld   %11ld\r\n"
+            "stay_in:...................%11ld   %11ld\r\n"
+            "eat_ice_cream:.............%11ld   %11ld\r\n"
+            "balance stored in mem:     %11ld   %11ld\r\n"
+            "balance returned in r0:    %11ld   %11ld\r\n"
+            "transaction stored in mem: %11ld   %11ld\r\n"
             "\r\n",
             testNum,
-            r0Balance,  // balance returned by asmFunc in r0
-            balance,    // balance stored in global data mem
-            correctBalance,  // computed by this test code
-            s1
+            myInputBalance,
+            myInputAmount,
+            flagsCheck,
+            memBalCheck,
+            regBalCheck,
+            transactionCheck,
+            myProb, we_have_a_problem,
+            myEatOut, eat_out,
+            myStayIn, stay_in,
+            myIceCream, eat_ice_cream,
+            correctBalance, balance,
+            correctBalance, r0Balance,
+            correctInMemTransaction, transaction
             );
 
 #if USING_HW 
@@ -213,6 +366,8 @@ int main ( void )
     int32_t failCount = 0;
     int32_t totalPassCount = 0;
     int32_t totalFailCount = 0;
+    // int32_t x1 = sizeof(tc);
+    // int32_t x2 = sizeof(tc[0]);
     uint32_t numTestCases = sizeof(tc)/sizeof(tc[0]);
     
     // Loop forever
