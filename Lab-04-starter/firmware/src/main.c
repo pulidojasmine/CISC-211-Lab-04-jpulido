@@ -38,6 +38,7 @@
 #include <stdlib.h>                     // Defines EXIT_FAILURE
 #include <string.h>
 #include <malloc.h>
+#include <inttypes.h>   // required to print out pointers using PRIXPTR macro
 #include "definitions.h"                // SYS function prototypes
 
 /* RTC Time period match values for input clock of 1 KHz */
@@ -68,14 +69,18 @@ static int32_t problemArray[] = {1,1,1,0,0,0};
 // the following array defines pairs of {balance, transaction} values
 // tc stands for test case
 static int32_t tc[][2] = {
-    {         5,          7},
-    {       100,        -50},
-    {        75,        -99},
-    {         0,        -42},
+    {         5,          7},  // normal case, no errs
+    {       100,        -50},  // normal case, result is +
+    {        75,        -99},  // normal case, result is -
+    {         0,        -42},  // test with a 0 input
+    {       -44,          0},  // test with a 0 input
     {         0,          0},
-    {0x80000001, 0x80000001},
-    {         0, 0x80000001},
-    {0x80000001,          0}
+    {       125,       1000},  // valid transaction amount
+    {       126,       1001},  // invalid transaction amount
+    {       127,      -1000},  // valid transaction amount
+    {       128,      -1001},  // invalid transaction amount
+    {0x7FFFFFFF,        120},  // overflow
+    {0x80000001,       -100}   // underlow
 };
 
 static char * pass = "PASS";
@@ -121,6 +126,43 @@ static void usartDmaChannelHandler(DMAC_TRANSFER_EVENT event, uintptr_t contextH
     }
 }
 #endif
+
+// print the mem addresses of the global vars at startup
+// this is to help the students debug their code
+static void printGlobalAddresses(void)
+{
+    // build the string to be sent out over the serial lines
+    snprintf((char*)uartTxBuffer, MAX_PRINT_LEN,
+            "========= GLOBAL VARIABLES MEMORY ADDRESS LIST\r\n"
+            "global variable \"balance\" stored at address:           0x%" PRIXPTR "\r\n"
+            "global variable \"transaction\" stored at address:       0x%" PRIXPTR "\r\n"
+            "global variable \"eat_out\" stored at address:           0x%" PRIXPTR "\r\n"
+            "global variable \"stay_in\" stored at address:           0x%" PRIXPTR "\r\n"
+            "global variable \"eat_ice_cream\" stored at address:     0x%" PRIXPTR "\r\n"
+            "global variable \"we_have_a_problem\" stored at address: 0x%" PRIXPTR "\r\n"
+            "========= END -- GLOBAL VARIABLES MEMORY ADDRESS LIST\r\n"
+            "\r\n",
+            (uintptr_t)(&balance), 
+            (uintptr_t)(&transaction), 
+            (uintptr_t)(&eat_out), 
+            (uintptr_t)(&stay_in), 
+            (uintptr_t)(&eat_ice_cream), 
+            (uintptr_t)(&we_have_a_problem)
+            ); 
+    isRTCExpired = false;
+    isUSARTTxComplete = false;
+
+#if USING_HW 
+    DMAC_ChannelTransfer(DMAC_CHANNEL_0, uartTxBuffer, \
+        (const void *)&(SERCOM5_REGS->USART_INT.SERCOM_DATA), \
+        strlen((const char*)uartTxBuffer));
+    // spin here, waiting for timer and UART to complete
+    while (isUSARTTxComplete == false); // wait for print to finish
+    /* reset it for the next print */
+    isUSARTTxComplete = false;
+#endif
+}
+
 
 // return failure count. A return value of 0 means everything passed.
 static int testResult(int testNum, 
@@ -360,6 +402,8 @@ int main ( void )
     isRTCExpired = true;
     isUSARTTxComplete = true;
 #endif //SIMULATOR
+    
+    printGlobalAddresses();
 
     // initialize all the variables
     int32_t passCount = 0;
