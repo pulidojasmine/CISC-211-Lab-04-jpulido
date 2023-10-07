@@ -373,6 +373,11 @@ static int testResult(int testNum,
     DMAC_ChannelTransfer(DMAC_CHANNEL_0, uartTxBuffer, \
         (const void *)&(SERCOM5_REGS->USART_INT.SERCOM_DATA), \
         strlen((const char*)uartTxBuffer));
+
+    // spin here until the UART has completed transmission
+    //while  (false == isUSARTTxComplete ); 
+    while (isUSARTTxComplete == false);
+    isUSARTTxComplete = false;
 #endif
 
     return *failCount;
@@ -410,6 +415,7 @@ int main ( void )
     int32_t failCount = 0;
     int32_t totalPassCount = 0;
     int32_t totalFailCount = 0;
+    int32_t totalTests = 0;
     // int32_t x1 = sizeof(tc);
     // int32_t x2 = sizeof(tc[0]);
     uint32_t numTestCases = sizeof(tc)/sizeof(tc[0]);
@@ -441,13 +447,28 @@ int main ( void )
                                    &passCount,&failCount);
             totalPassCount = totalPassCount + passCount;
             totalFailCount = totalFailCount + failCount;
+            totalTests = totalPassCount + totalFailCount;
 
 #if USING_HW
+
+            // print summary of tests executed so far
+            isUSARTTxComplete = false;
+            snprintf((char*)uartTxBuffer, MAX_PRINT_LEN,
+                    "========= In-progress test summary:\r\n"
+                    "%ld of %ld tests passed so far...\r\n"
+                    "\r\n",
+                    totalPassCount, totalTests); 
+
+            DMAC_ChannelTransfer(DMAC_CHANNEL_0, uartTxBuffer, \
+                (const void *)&(SERCOM5_REGS->USART_INT.SERCOM_DATA), \
+                strlen((const char*)uartTxBuffer));
+
             // spin here until the UART has completed transmission
-            // and the timer has expired
-            //while  (false == isUSARTTxComplete ); 
+            // and the LED toggle timer has expired. This allows
+            // the test cases to be spread out in time.
             while ((isRTCExpired == false) ||
                    (isUSARTTxComplete == false));
+            
 #endif
 
         } // for each test case
@@ -457,14 +478,14 @@ int main ( void )
         // We do this in case there are very few tests and they don't have the
         // terminal hooked up in time.
         uint32_t idleCount = 1;
-        uint32_t totalTests = totalPassCount + totalFailCount;
+        // uint32_t totalTests = totalPassCount + totalFailCount;
         bool firstTime = true;
         while(true)      // post-test forever loop
         {
             isRTCExpired = false;
             isUSARTTxComplete = false;
             snprintf((char*)uartTxBuffer, MAX_PRINT_LEN,
-                    "========= Post-test Idle Cycle Number: %ld\r\n"
+                    "========= TESTS COMPLETE: Post-test Idle Cycle Number: %ld\r\n"
                     "Summary of tests: %ld of %ld tests passed\r\n"
                     "\r\n",
                     idleCount, totalPassCount, totalTests); 
