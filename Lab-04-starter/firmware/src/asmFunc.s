@@ -33,8 +33,6 @@ we_have_a_problem: .word     0  /* output value */
 .text
 .align
 
-/* Tell the assembler to allow both 16b and 32b extended Thumb instructions */
-.syntax unified
 
     
 /********************************************************************
@@ -58,12 +56,6 @@ asmFunc:
     /* save the caller's registers, as required by the ARM calling convention */
     push {r4-r11,LR}
  
-.if 0
-    /* profs test code. */
-    LDR r1,=balance
-    LDR r2,[r1]
-    ADD r0,r0,r2
-.endif
     
     /*** STUDENTS: Place your code BELOW this line!!! **************/
 
