@@ -400,7 +400,7 @@ int main ( void )
     SYS_Initialize ( NULL );
     DMAC_ChannelCallbackRegister(DMAC_CHANNEL_0, usartDmaChannelHandler, 0);
     RTC_Timer32CallbackRegister(rtcEventHandler, 0);
-    RTC_Timer32Compare0Set(PERIOD_500MS);
+    RTC_Timer32Compare0Set( PERIOD_500MS / 10 );
     RTC_Timer32CounterSet(0);
     RTC_Timer32Start();
 #else // using the simulator
@@ -484,11 +484,18 @@ int main ( void )
         {
             isRTCExpired = false;
             isUSARTTxComplete = false;
+
+            uint32_t numPointsMax = 30;
+            uint32_t pointsScored = numPointsMax * totalPassCount / totalTests;
+            
             snprintf((char*)uartTxBuffer, MAX_PRINT_LEN,
-                    "========= TESTS COMPLETE: Post-test Idle Cycle Number: %ld\r\n"
+                    "========= ALL TESTS COMPLETE: Post-test Idle Cycle Number: %ld\r\n"
                     "Summary of tests: %ld of %ld tests passed\r\n"
+                    "Final score for test cases: %ld of %ld points\r\n"
                     "\r\n",
-                    idleCount, totalPassCount, totalTests); 
+                    idleCount, 
+                    totalPassCount, totalTests,
+                    pointsScored, numPointsMax); 
 
 #if USING_HW 
             DMAC_ChannelTransfer(DMAC_CHANNEL_0, uartTxBuffer, \
