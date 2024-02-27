@@ -39,3 +39,4 @@
 *.hex
 *.s~
 *.c~
+/Lab-04-starter/firmware/Lab-04-starter.X/build/

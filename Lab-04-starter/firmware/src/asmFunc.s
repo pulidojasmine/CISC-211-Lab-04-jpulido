@@ -58,7 +58,83 @@ asmFunc:
  
     
     /*** STUDENTS: Place your code BELOW this line!!! **************/
+    
 
+    /* setting everything other than "balance" to 0, every time asmFunc runs */
+	
+    /* copying r0 to transaction - r0 is where the input is located */
+    LDR
+    STR R0, [transaction]
+    
+    /* compare the transaction amount, is amount greater than 1000 */
+    LDR R0, =transaction
+    LDR R1, [R0]
+    
+    CMP R1, 1000
+    BGT out_of_bounds
+    
+    CMP R1, -1000
+    BLT out_of_bounds
+    
+    /* what happens when value is in bounds = calc tempBalance */
+    LDR R0, =balance
+    LDR R0, [R0]
+    ADD R2, R0, R1
+    
+    CMP R2, R0
+    BNE out_of_bounds
+    
+    /* copying what's in R2 into balance */
+    STR R2, [balance]
+    
+    /* if balance is less than zero, branch to less_than_zero -> stay_in */
+    CMP R2, 0
+    BLT less_than_zero
+    
+    /* if balance is greater than zero, they eat out */
+    LDR R0, =eat_out
+    MOV R1, 1
+    STR R1, [R0]
+    
+    /* this sets R0 = balance */
+    LDR R0, =balance
+    LDR R0, [R0]
+    B done
+    
+    /* branch to if balance is zero */
+    CMP R2, 0
+    BEQ execute_ice_cream
+    
+    
+    out_of_bounds:
+    STR R0, [transaction]
+    LDR R0, =we_have_a_problem
+    MOV R1, 1
+    STR R1, [R0]
+    LDR R0, =balance
+    LDR R1, [R0]
+    
+    /* creates a branch to "done" in order to complete the program */
+    B done
+    
+    less_than_zero:
+    /* if balance is less than zero, they stay in */
+    LDR R0, =stay_in
+    MOV R1, [R0]
+    
+    LDR R0, =balance
+    LDR R0, [R0]
+    B done
+    
+    
+    execute_ice_cream:
+    LDR R0, =eat_ice_cream
+    MOV R1, 1
+    STR R1, [R0]
+    
+    LDR R0, =balance
+    LDR R0, [R0]
+    B done
     
     /*** STUDENTS: Place your code ABOVE this line!!! **************/
 
